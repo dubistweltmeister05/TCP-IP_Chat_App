@@ -1,58 +1,59 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+#include <stdlib.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
 #define PORT 8080
-#define MAX_CLIENTS 5
-#define BUFFER_SIZE 1024
+#define MAX_CLIENTS 10
+#define BUFFER_SIZE 4096 // 4KB buffer size
 
-#pragma comment(lib, "ws2_32.lib")
+#pragma comment(lib, "Ws2_32.lib")
 
 int main()
 {
     WSADATA wsaData;
-    SOCKET server_fd, new_socket, client_sockets[MAX_CLIENTS] = {0};
+    SOCKET server_sock, new_sock, client_sock[MAX_CLIENTS] = {0}; // Initializing the client socket array to 0 for all clients
     struct sockaddr_in address;
-    int addrlen = sizeof(address);
-    fd_set readfds;
-    char buffer[BUFFER_SIZE];
+    int addrlen = sizeof(address); // this is the length of the address that we have received
 
-    // Initialize Winsock
+    fd_set readfds; // this is the set of file descriptors that we are going to use
+
+    char buffer[BUFFER_SIZE] = {0}; // this is the buffer that we are going to use to store the messages that we are going to receive
+
+    // initializing the winsock library
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
     {
         printf("WSAStartup failed.\n");
         return 1;
     }
 
-    // Create socket
-    server_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (server_fd == INVALID_SOCKET)
+    server_sock = socket(AF_INET, SOCK_STREAM, 0); // initializes the socket
+    if (server_sock == INVALID_SOCKET)
     {
-        printf("Socket failed.\n");
+        perror("Couldn't create the damn socket");
         WSACleanup();
         return 1;
     }
 
     address.sin_family = AF_INET;
-    address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(PORT);
+    address.sin_addr.s_addr = INADDR_ANY; // bind to all available network interfaces
+    address.sin_port = htons(PORT);       // host-to-network byte order conversion
 
-    // Bind
-    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) == SOCKET_ERROR)
+    // binding the socket to the address
+    if (bind(server_sock, (struct sockaddr *)&address, sizeof(address)) == SOCKET_ERROR)
     {
-        printf("Bind failed.\n");
-        closesocket(server_fd);
+        perror("Couldn't bind the damn socket");
+        closesocket(server_sock);
         WSACleanup();
         return 1;
     }
 
-    // Listen
-    if (listen(server_fd, MAX_CLIENTS) == SOCKET_ERROR)
+    // now, we listen to the socket for client messages
+    if (listen(server_sock, MAX_CLIENTS) == SOCKET_ERROR)
     {
-        printf("Listen failed.\n");
-        closesocket(server_fd);
+        perror("Couldn't listen to the fucking socket man\n");
+        closesocket(server_sock);
         WSACleanup();
         return 1;
     }
@@ -61,49 +62,55 @@ int main()
 
     while (1)
     {
-        FD_ZERO(&readfds);
-        FD_SET(server_fd, &readfds);
-        SOCKET max_sd = server_fd;
+        FD_ZERO(&readfds);             // clear the file descriptor set
+        FD_SET(server_sock, &readfds); // add the server socket to the set
+        SOCKET max_sd = server_sock;   // initialize the maximum socket descriptor to the server socket
 
         for (int i = 0; i < MAX_CLIENTS; i++)
         {
-            SOCKET sd = client_sockets[i];
+            // socket descriptor
+            SOCKET sd = client_sock[i];
             if (sd > 0)
                 FD_SET(sd, &readfds);
             if (sd > max_sd)
                 max_sd = sd;
         }
 
-        int activity = select(0, &readfds, NULL, NULL, NULL);
+        int activity = select(0, &readfds, NULL, NULL, NULL); // select() blocks until an activity is detected
         if (activity == SOCKET_ERROR)
         {
             printf("Select error.\n");
             continue;
         }
 
-        if (FD_ISSET(server_fd, &readfds))
+        // Checking for new connections
+        if (FD_ISSET(server_sock, &readfds)) // if the server socket is in the set of file descriptors that we are monitoring for activity then we have a new connection to accept
+                                             // from the client side and we need to add it to the client array of sockets that we have created earlier on in the code.
         {
-            new_socket = accept(server_fd, (struct sockaddr *)&address, &addrlen);
-            if (new_socket == INVALID_SOCKET)
+            new_sock = accept(server_sock, (struct sockaddr *)&address, &addrlen); // accept the new connection
+            if (new_sock == INVALID_SOCKET)
             {
                 printf("Accept failed.\n");
                 continue;
             }
 
             printf("New client connected.\n");
+
+            // Adding new socket to the client array
             for (int i = 0; i < MAX_CLIENTS; i++)
             {
-                if (client_sockets[i] == 0)
+                if (client_sock[i] == 0)
                 {
-                    client_sockets[i] = new_socket;
+                    client_sock[i] = new_sock;
                     break;
                 }
             }
         }
 
+        // Handling client messages
         for (int i = 0; i < MAX_CLIENTS; i++)
         {
-            SOCKET sd = client_sockets[i];
+            SOCKET sd = client_sock[i];
             if (FD_ISSET(sd, &readfds))
             {
                 int valread = recv(sd, buffer, BUFFER_SIZE, 0);
@@ -111,7 +118,7 @@ int main()
                 {
                     printf("Client disconnected.\n");
                     closesocket(sd);
-                    client_sockets[i] = 0;
+                    client_sock[i] = 0;
                 }
                 else
                 {
@@ -122,7 +129,8 @@ int main()
         }
     }
 
-    closesocket(server_fd);
+    // Cleanup (This will only execute if we break out of the loop)
+    closesocket(server_sock);
     WSACleanup();
     return 0;
 }
