@@ -2,6 +2,51 @@
 
 A robust command-line chat application implemented in C using Windows Sockets 2 (Winsock2) API. This application demonstrates basic client-server network programming concepts through a TCP/IP-based chat system that supports multiple concurrent client connections.
 
+## ✨ Current Status
+
+- ✅ Basic server functionality working
+- ✅ Client connection successful
+- ✅ Multiple client support confirmed
+- ✅ Message sending operational
+- ⏳ Username system (planned)
+- ⏳ Message broadcasting (planned)
+
+## 🚀 Quick Start Guide
+
+1. **Compile the Programs**
+
+   ```bash
+   gcc chat_server.c -o server.exe -lws2_32
+   gcc chat_client.c -o client.exe -lws2_32
+   ```
+
+2. **Start the Server**
+
+   - Open Command Prompt
+   - Navigate to your project directory
+   - Run:
+
+   ```bash
+   server.exe
+   ```
+
+   - Wait for "Server listening on port 8080..." message
+
+3. **Connect Clients**
+   - Open new Command Prompt window(s)
+   - Navigate to project directory
+   - Run:
+   ```bash
+   client.exe
+   ```
+   - Start chatting!
+
+### Testing Multiple Clients
+
+- Open additional Command Prompt windows
+- Run `client.exe` in each window
+- Each client can send messages independently
+
 ## 🌟 Features
 
 ### Server Capabilities
