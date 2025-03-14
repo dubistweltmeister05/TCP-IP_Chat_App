@@ -7,13 +7,23 @@
 #define PORT 8080
 #define MAX_CLIENTS 10
 #define BUFFER_SIZE 4096 // 4KB buffer size
+#define MAX_USERNAME 32
+
+// a struct to hold the username for each client
+struct Client
+{
+    SOCKET socket;
+    char username[MAX_USERNAME];
+    int active; // keep it 1 if the slot is used, else let it be 0
+};
 
 #pragma comment(lib, "Ws2_32.lib")
 
 int main()
 {
     WSADATA wsaData;
-    SOCKET server_sock, new_sock, client_sock[MAX_CLIENTS] = {0}; // Initializing the client socket array to 0 for all clients
+    SOCKET server_sock, new_sock = {0}; // Initializing the client socket array to 0 for all clients
+    struct Client clients[MAX_CLIENTS] = {0};
     struct sockaddr_in address;
     int addrlen = sizeof(address); // this is the length of the address that we have received
 
@@ -69,7 +79,7 @@ int main()
         for (int i = 0; i < MAX_CLIENTS; i++)
         {
             // socket descriptor
-            SOCKET sd = client_sock[i];
+            SOCKET sd = clients[i].socket;
             if (sd > 0)
                 FD_SET(sd, &readfds);
             if (sd > max_sd)
@@ -94,14 +104,19 @@ int main()
                 continue;
             }
 
+            char usrName[MAX_USERNAME] = {0};
+            recv(new_sock, usrName, MAX_USERNAME - 1, 0);
             printf("New client connected.\n");
 
             // Adding new socket to the client array
             for (int i = 0; i < MAX_CLIENTS; i++)
             {
-                if (client_sock[i] == 0)
+                if (clients[i].active == 0)
                 {
-                    client_sock[i] = new_sock;
+                    clients[i].socket = new_sock;
+                    strncpy(clients[i].username, usrName, MAX_USERNAME - 1);
+                    clients[i].active = 1;
+                    printf("New Client :- %s connected \n", usrName);
                     break;
                 }
             }
@@ -110,20 +125,21 @@ int main()
         // Handling client messages
         for (int i = 0; i < MAX_CLIENTS; i++)
         {
-            SOCKET sd = client_sock[i];
-            if (FD_ISSET(sd, &readfds))
+            SOCKET sd = clients[i].socket;
+            if (clients[i].active && FD_ISSET(sd, &readfds))
             {
                 int valread = recv(sd, buffer, BUFFER_SIZE, 0);
                 if (valread <= 0)
                 {
                     printf("Client disconnected.\n");
                     closesocket(sd);
-                    client_sock[i] = 0;
+                    clients[i].active = 0;
+                    clients[i].socket = 0;
                 }
                 else
                 {
                     buffer[valread] = '\0';
-                    printf("Client: %s\n", buffer);
+                    printf("%s : %s\n", clients[i].username, buffer);
                 }
             }
         }

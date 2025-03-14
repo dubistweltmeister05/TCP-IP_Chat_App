@@ -5,7 +5,7 @@
 #include <ws2tcpip.h>
 
 #define PORT 8080
-#define BUFFER_SIZE 1024
+#define BUFFER_SIZE 4096
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -47,10 +47,23 @@ int main()
 
     printf("Connected to server. Type messages:\n");
 
+    char username[32];
+    printf("WHat's your name mate?\n");
+    fgets(username, sizeof(username), stdin); // read from the user via stdin stream, store in username
+    username[strcspn(username, "\n")] = 0;
+
+    send(sock, username, strlen(username), 0);
+
+    printf("COnnected to the server as &s. Send in the messages\n", username);
     while (1)
     {
-        fgets(buffer, BUFFER_SIZE, stdin);
-        send(sock, buffer, strlen(buffer), 0);
+        char message[BUFFER_SIZE];
+        fgets(message, BUFFER_SIZE, stdin);
+
+        // Format: "username: message"
+        char formatted_msg[BUFFER_SIZE + 32];
+        snprintf(formatted_msg, sizeof(formatted_msg), "%s: %s", username, message);
+        send(sock, formatted_msg, strlen(formatted_msg), 0);
     }
 
     closesocket(sock);
